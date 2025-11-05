@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>US State–County Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { margin: 0; font-family: system-ui; background: #f9fafb; }
+      svg { width: 100vw; height: 100vh; display: block; }
+      .state { fill: #228B22; stroke: #fff; stroke-width: 0.8px; cursor: pointer; }
+      .county { fill: #228B22; stroke: #fff; stroke-width: 0.3px; cursor: pointer; }
+      .county:hover { fill: #cfeeda; }
+      .tooltip {
+        position: absolute;
+        background: white;
+        padding: 4px 8px;
+        border: 1px solid #ccc;
+        font-size: 12px;
+        pointer-events: none;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        animation: fadeIn 0.3s;
+      }
+      .modal.active {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .modal-content {
+        background-color: #fff;
+        padding: 30px;
+        border-radius: 8px;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        animation: slideIn 0.3s;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes slideIn {
+        from { transform: translateY(-20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #e0e0e0;
+      }
+      .modal-header h2 {
+        margin: 0;
+        color: #333;
+        font-size: 24px;
+      }
+      .close {
+        font-size: 28px;
+        font-weight: bold;
+        color: #999;
+        cursor: pointer;
+        line-height: 1;
+      }
+      .close:hover {
+        color: #333;
+      }
+      .stats-section {
+        margin-bottom: 25px;
+      }
+      .stats-section h3 {
+        margin: 0 0 12px 0;
+        color: #555;
+        font-size: 18px;
+        font-weight: 600;
+      }
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      .stat-label {
+        color: #666;
+        font-weight: 500;
+      }
+      .stat-value {
+        color: #333;
+        font-weight: 600;
+      }
+      .stat-bar-container {
+        margin-top: 5px;
+        height: 8px;
+        background-color: #e0e0e0;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .stat-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #4a90e2, #357abd);
+        transition: width 0.5s ease;
+      }
+      .income-bracket {
+        margin: 10px 0;
+      }
+      .age-group, .income-bracket {
+        margin: 8px 0;
+      }
+      .demographic-list {
+        list-style: none;
+        padding-left: 0;
+        line-height: 1.6;
+      }
+      .info-section {
+        margin-top: 10px;
+      }
+      .instruction {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(255,255,255,0.9);
+        padding: 10px 15px;
+        border-radius: 6px;
+        font-size: 13px;
+        color: #666;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      }
+      /* Logo */
+      .logo-container {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 102;
+        margin-bottom: 10px;
+      }
+      .logo-container img {
+        height: 50px;
+        width: auto;
+        display: block;
+      }
+      /* Search Box */
+      .search-container {
+        position: fixed;
+        top: 80px;
+        left: 20px;
+        z-index: 101;
+        width: 300px;
+      }
+      .search-box {
+        position: relative;
+        width: 100%;
+      }
+      .search-input {
+        width: 100%;
+        padding: 10px 15px;
+        padding-right: 35px;
+        border: 2px solid #e0e0e0;
+        border-radius: 6px;
+        font-size: 14px;
+        background: rgba(255,255,255,0.95);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        transition: border-color 0.2s;
+      }
+      .search-input:focus {
+        outline: none;
+        border-color: #228B22;
+      }
+      .search-icon {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+        pointer-events: none;
+      }
+      .search-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        margin-top: 4px;
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-height: 300px;
+        overflow-y: auto;
+        display: none;
+        z-index: 102;
+      }
+      .search-dropdown.active {
+        display: block;
+      }
+      .search-result {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background 0.15s;
+      }
+      .search-result:hover,
+      .search-result.selected {
+        background: #f8f9fa;
+      }
+      .search-result:last-child {
+        border-bottom: none;
+      }
+      .search-result-name {
+        font-weight: 500;
+        color: #212529;
+        font-size: 14px;
+      }
+      .search-result-fips {
+        font-size: 12px;
+        color: #6c757d;
+        margin-top: 2px;
+      }
+      .search-result-state {
+        font-size: 11px;
+        color: #adb5bd;
+        margin-top: 2px;
+      }
+      /* Breadcrumb Navigation */
+      .breadcrumb {
+        position: fixed;
+        top: 130px;
+        left: 20px;
+        background: rgba(255,255,255,0.9);
+        padding: 10px 15px;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #6c757d;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        z-index: 100;
+        display: none;
+      }
+      .breadcrumb.active {
+        display: block;
+      }
+      .breadcrumb-segment {
+        cursor: pointer;
+        color: #212529;
+        font-weight: 500;
+        transition: color 0.2s;
+      }
+      .breadcrumb-segment:hover {
+        color: #4a90e2;
+      }
+      .breadcrumb-separator {
+        margin: 0 8px;
+        color: #adb5bd;
+      }
+      /* Neighbor visibility */
+      .state.inactive {
+        opacity: 0.6;
+      }
+      .county.inactive {
+        opacity: 0.5;
+      }
+      /* Improved Modal Typography */
+      .modal-header .county-name {
+        font-size: 22px;
+        font-weight: 700;
+        color: #212529;
+        margin: 0 0 4px 0;
+      }
+      .modal-header .state-name {
+        font-size: 14px;
+        font-weight: 400;
+        color: #6c757d;
+        margin: 0;
+      }
+      .stats-section h3 {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #868e96;
+        font-weight: 600;
+        margin: 0 0 12px 0;
+      }
+      .stat-row .stat-value {
+        font-size: 14px;
+        font-weight: 500;
+        color: #212529;
+        text-align: right;
+      }
+      .stat-row .stat-label {
+        font-size: 14px;
+        color: #6c757d;
+      }
+      .source-note {
+        font-size: 11px;
+        font-style: italic;
+        color: #adb5bd;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid #e0e0e0;
+      }
+      /* Gender Ratio Bar */
+      .gender-bar {
+        display: flex;
+        height: 24px;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+      .gender-segment {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 11px;
+        font-weight: 600;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+      }
+      .gender-male {
+        background: #6BAED6;
+      }
+      .gender-female {
+        background: #FDAE6B;
+      }
+      /* Sparkline / Histogram */
+      .sparkline-container {
+        margin-top: 8px;
+        height: 140px;
+        width: 100%;
+      }
+      .sparkline {
+        width: 100%;
+        height: 100%;
+      }
+      .sparkline-line {
+        fill: none;
+        stroke: #4a90e2;
+        stroke-width: 2;
+      }
+      .sparkline-area {
+        fill: rgba(74, 144, 226, 0.1);
+      }
+      .sparkline-marker {
+        fill: #4a90e2;
+        stroke: white;
+        stroke-width: 2;
+      }
+      /* Collapsible Section */
+      .collapsible-header {
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+      }
+      .collapsible-header:hover {
+        color: #4a90e2;
+      }
+      .collapsible-content {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+      }
+      .collapsible-content.expanded {
+        max-height: 2000px;
+        transition: max-height 0.3s ease-in;
+      }
+      .collapsible-icon {
+        transition: transform 0.3s;
+        font-size: 12px;
+      }
+      .collapsible-icon.expanded {
+        transform: rotate(180deg);
+      }
+      /* Mini-map */
+      .minimap {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 120px;
+        height: 80px;
+        background: rgba(255,255,255,0.9);
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        z-index: 100;
+        display: none;
+      }
+      .minimap.active {
+        display: block;
+      }
+      .minimap svg {
+        width: 100%;
+        height: 100%;
+      }
+      .minimap-viewport {
+        fill: rgba(74, 144, 226, 0.3);
+        stroke: #4a90e2;
+        stroke-width: 1.5;
+        stroke-dasharray: 4,4;
+      }
+      /* Toast notification */
+      .toast {
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #333;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-size: 14px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 2000;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .toast.show {
+        opacity: 1;
+      }
+      /* Loading overlay */
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.3);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1500;
+      }
+      .loading-spinner {
+        font-size: 48px;
+        margin-bottom: 12px;
+      }
+      .loading-text {
+        color: white;
+        font-size: 16px;
+      }
+      /* Demo Button */
+      .demo-btn {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1100;
+        background: #4a90e2;
+        color: #fff;
+        border: 0;
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        transition: background 0.2s;
+      }
+      .demo-btn:hover {
+        background: #357abd;
+      }
+      .demo-btn:disabled {
+        background: #adb5bd;
+        cursor: not-allowed;
+      }
+      .demo-skip {
+        position: fixed;
+        top: 20px;
+        right: 100px;
+        z-index: 1100;
+        font-size: 13px;
+        color: #6c757d;
+        background: rgba(255,255,255,0.9);
+        padding: 6px 10px;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        text-decoration: none;
+        cursor: pointer;
+        transition: color 0.2s;
+      }
+      .demo-skip:hover {
+        color: #212529;
+      }
+      #history-panel {
+        position: fixed;
+        right: 0;
+        top: 10vh;
+        bottom: calc(10vh + 20px); /* extra spacing below */
+        width: 220px; /* ~1.5 inch width on a 13” screen */
+        background-color: #cfeeda; /* soft pastel green */
+        border-left: 1px solid #a4cbb9;
+        padding: 10px;
+        overflow-y: auto;
+        box-shadow: -2px 0 5px rgba(0,0,0,0.15);
+        font-family: sans-serif;
+      }
+      #history-panel h3 {
+        text-align: center;
+        margin-top: 0;
+        margin-bottom: 10px;
+      }
+      .history-item {
+        padding: 8px;
+        margin-bottom: 8px;
+        background: #ffffffcc;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .history-item:hover {
+        background: #ffffff;
+      }
+      .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .pin-btn {
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+      .pin-btn:hover {
+        transform: scale(1.2);
+      }
+      .history-item.pinned {
+        background: rgba(255, 255, 200, 0.45);
+        border-left: 3px solid #f4d03f;
+      }
+      .trend {
+        font-size: 12px;
+        margin-left: 4px;
+      }
+      .trend.up {
+        color: #2e7d32; /* green */
+      }
+      .trend.down {
+        color: #c62828; /* red */
+      }
+      .trend.same {
+        color: #757575; /* neutral gray */
+      }
+    </style>
+  </head>
+  <body>
+    <svg></svg>
+    <div id="tooltip" class="tooltip" style="opacity:0;"></div>
+    <div class="logo-container">
+      <img src="/logo.svg" alt="Logo" />
+    </div>
+    <div class="search-container">
+      <div class="search-box">
+        <input type="text" id="county-search" class="search-input" placeholder="Search counties by name or FIPS...">
+        <span class="search-icon">🔍</span>
+        <div id="search-dropdown" class="search-dropdown"></div>
+      </div>
+    </div>
+    <div id="breadcrumb" class="breadcrumb"></div>
+    <div id="modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h2 class="county-name" id="modal-title">County Demographics</h2>
+            <p class="state-name" id="modal-subtitle"></p>
+          </div>
+          <span class="close" id="modal-close">&times;</span>
+        </div>
+        <div id="modal-body"></div>
+      </div>
+    </div>
+    <div class="instruction">💡 Click for cached data • Double-click for fresh ACS data</div>
+    <div id="minimap" class="minimap">
+      <svg></svg>
+    </div>
+    <div id="toast" class="toast" style="display: none;"></div>
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+      <div class="loading-spinner">⏳</div>
+      <div class="loading-text">Fetching ACS data...</div>
+    </div>
+    <button id="demo-btn" class="demo-btn" aria-label="Play demo tour">▶ Demo</button>
+    <a id="demo-skip" class="demo-skip" aria-label="Skip demo" hidden>Skip</a>
+    <script type="module" src="/src/main.js"></script>
+    <div id="history-panel">
+      <h3>History</h3>
+      <div id="history-items"></div>
+    </div>
+  </body>
+</html>
+

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>US State–County Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { margin: 0; font-family: system-ui; background: #f9fafb; }
+      svg { width: 100vw; height: 100vh; display: block; }
+      .state { fill: #cfd8dc; stroke: #fff; stroke-width: 0.8px; cursor: pointer; }
+      .county { fill: #b0bec5; stroke: #fff; stroke-width: 0.3px; }
+      .tooltip {
+        position: absolute;
+        background: white;
+        padding: 4px 8px;
+        border: 1px solid #ccc;
+        font-size: 12px;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <svg></svg>
+    <div id="tooltip" class="tooltip" style="opacity:0;"></div>
+    <script type="module" src="../src/main.js"></script>
+  </body>
+</html>
+

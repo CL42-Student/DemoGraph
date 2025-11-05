@@ -1,0 +1,146 @@
+{
+  "comment": "Sample demographic data for US counties by FIPS code. Replace with real Census data as needed.",
+  "data": {
+    "01001": {
+      "name": "Autauga County, Alabama",
+      "fips": "01001",
+      "population": 58805,
+      "medianAge": 38.2,
+      "gender": {
+        "male": 48.5,
+        "female": 51.5
+      },
+      "ageGroups": {
+        "0-17": 23.1,
+        "18-34": 26.8,
+        "35-54": 25.4,
+        "55-64": 12.7,
+        "65+": 12.0
+      },
+      "income": {
+        "medianHousehold": 61616,
+        "meanHousehold": 74782,
+        "brackets": {
+          "under25k": 15.2,
+          "25k-50k": 20.3,
+          "50k-75k": 19.8,
+          "75k-100k": 15.1,
+          "100k-150k": 17.5,
+          "150k+": 12.1
+        }
+      },
+      "education": {
+        "highSchoolOrLess": 38.2,
+        "someCollege": 28.5,
+        "bachelors": 22.1,
+        "graduate": 11.2
+      }
+    },
+    "06037": {
+      "name": "Los Angeles County, California",
+      "fips": "06037",
+      "population": 10014009,
+      "medianAge": 37.3,
+      "gender": {
+        "male": 49.3,
+        "female": 50.7
+      },
+      "ageGroups": {
+        "0-17": 21.8,
+        "18-34": 28.2,
+        "35-54": 26.1,
+        "55-64": 12.4,
+        "65+": 11.5
+      },
+      "income": {
+        "medianHousehold": 71417,
+        "meanHousehold": 96430,
+        "brackets": {
+          "under25k": 18.5,
+          "25k-50k": 18.2,
+          "50k-75k": 16.8,
+          "75k-100k": 13.5,
+          "100k-150k": 18.2,
+          "150k+": 14.8
+        }
+      },
+      "education": {
+        "highSchoolOrLess": 32.4,
+        "someCollege": 26.3,
+        "bachelors": 27.1,
+        "graduate": 14.2
+      }
+    },
+    "36061": {
+      "name": "New York County, New York",
+      "fips": "36061",
+      "population": 1694251,
+      "medianAge": 37.5,
+      "gender": {
+        "male": 47.8,
+        "female": 52.2
+      },
+      "ageGroups": {
+        "0-17": 15.2,
+        "18-34": 32.1,
+        "35-54": 28.5,
+        "55-64": 12.8,
+        "65+": 11.4
+      },
+      "income": {
+        "medianHousehold": 79926,
+        "meanHousehold": 123030,
+        "brackets": {
+          "under25k": 20.3,
+          "25k-50k": 15.2,
+          "50k-75k": 12.8,
+          "75k-100k": 11.5,
+          "100k-150k": 18.2,
+          "150k+": 22.0
+        }
+      },
+      "education": {
+        "highSchoolOrLess": 18.5,
+        "someCollege": 16.2,
+        "bachelors": 31.4,
+        "graduate": 33.9
+      }
+    },
+    "48201": {
+      "name": "Harris County, Texas",
+      "fips": "48201",
+      "population": 4731145,
+      "medianAge": 34.6,
+      "gender": {
+        "male": 49.8,
+        "female": 50.2
+      },
+      "ageGroups": {
+        "0-17": 25.3,
+        "18-34": 28.7,
+        "35-54": 26.8,
+        "55-64": 11.2,
+        "65+": 8.0
+      },
+      "income": {
+        "medianHousehold": 61885,
+        "meanHousehold": 82942,
+        "brackets": {
+          "under25k": 16.8,
+          "25k-50k": 21.2,
+          "50k-75k": 19.5,
+          "75k-100k": 14.8,
+          "100k-150k": 16.5,
+          "150k+": 11.2
+        }
+      },
+      "education": {
+        "highSchoolOrLess": 40.2,
+        "someCollege": 27.8,
+        "bachelors": 22.5,
+        "graduate": 9.5
+      }
+    }
+  }
+}
+

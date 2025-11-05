@@ -1,0 +1,383 @@
+================================================================================
+DEMOGRAPH: INTERACTIVE COUNTY DEMOGRAPHICS VISUALIZATION
+================================================================================
+
+PROJECT OVERVIEW
+================================================================================
+
+DemoGraph is an interactive web application that visualizes United States 
+county-level demographic data on an interactive map. The application allows 
+users to explore demographic statistics, compare counties, and analyze 
+demographic trends across the United States.
+
+The application provides a rich, data-driven exploration tool for 
+demographers, researchers, policy makers, and anyone interested in 
+understanding the demographic composition of U.S. counties.
+
+================================================================================
+TECHNOLOGIES AND TOOLS
+================================================================================
+
+Frontend Technologies:
+- HTML5/CSS3 for structure and styling
+- JavaScript (ES6+) for interactivity
+- D3.js (v7.9.0) for data visualization and map rendering
+- Chart.js (v4.5.1) for chart visualizations
+- TopoJSON for geographic data format
+- Vite (v7.1.12) as development server and build tool
+
+Data Sources:
+- U.S. Census Bureau American Community Survey (ACS) 5-Year Estimates (2022)
+- TopoJSON geographic data files (us-states.json, us-counties.json)
+- Local demographics.json cache file
+
+API Integration:
+- U.S. Census Bureau API for on-demand demographic data fetching
+- Requires API key (optional but recommended) - see API_SETUP.md
+
+================================================================================
+MAIN FEATURES
+================================================================================
+
+1. INTERACTIVE MAP NAVIGATION
+   - Full U.S. map view with all 50 states
+   - Click any state to zoom in and view counties
+   - Pan and zoom controls (mouse wheel, drag)
+   - Minimap navigation aid (appears when zoomed in)
+   - Breadcrumb navigation showing current location
+   - Visual feedback: forest green (default), pastel green (selected/hovered)
+
+2. COUNTY SEARCH FUNCTIONALITY
+   - Search box in upper left corner
+   - Search by county name (case-insensitive, partial match)
+   - Search by FIPS code (numeric county identifier)
+   - Search by state name (to filter counties by state)
+   - Real-time autocomplete dropdown (up to 10 results)
+   - Keyboard navigation (Arrow keys, Enter, Escape)
+   - Automatic navigation to selected county on map
+
+3. COUNTY DEMOGRAPHIC DATA DISPLAY
+   - Click county: View cached/pre-loaded demographic data
+   - Double-click county: Fetch fresh data from Census Bureau API
+   - Modal popup with comprehensive statistics
+
+4. DEMOGRAPHIC STATISTICS DISPLAYED
+   - Population & Age:
+     * Total Population
+     * Median Age
+     * Gender Distribution (Male/Female percentage with visual bar)
+   
+   - Income Analysis:
+     * Median Household Income
+     * Comparison vs State Median (with trend indicator)
+     * Income Distribution Histogram:
+       - Visual comparison of county income vs all counties
+       - Shows percentile ranking
+       - State median reference line
+       - County position marker
+   
+   - Income Distribution Brackets:
+     * Under $25,000
+     * $25,000 - $50,000
+     * $50,000 - $75,000
+     * $75,000 - $100,000
+     * $100,000 - $150,000
+     * $150,000+
+     * Animated progress bars showing percentage in each bracket
+   
+   - Community & Demographic Composition:
+     * Generational Breakdown:
+       - Gen Alpha (ages 0-14)
+       - Gen Z (ages 15-24)
+       - Millennials (ages 25-39)
+       - Gen X (ages 40-54)
+       - Baby Boomers (ages 55+)
+       - Displayed as percentage of total population
+   
+     * Ethnicity Breakdown:
+       - White (Non-Hispanic)
+       - Black or African American
+       - Native American
+       - Asian
+       - Pacific Islander
+       - Hispanic/Latino (Any Race)
+       - Each displayed as percentage of total population
+   
+   - Household Structure Insights:
+     * Percentage of Single-Person Households
+     * Percentage of Non-Family Households
+     * Average Household Size
+     * Percentage of Housing in Large Multi-Unit Buildings
+
+5. HISTORY PANEL
+   - Located on right side of screen
+   - Tracks last 10 counties viewed
+   - Displays for each county:
+     * County name
+     * Population
+     * Median Age
+     * Median Income
+     * Trend indicators (up/down/same arrows) comparing to baseline
+   - Pin/Unpin functionality:
+     * Click pin icon to set as baseline for comparisons
+     * Pinned counties stay at top of list
+     * Trend indicators compare current selection to pinned baseline
+     * If no baseline pinned, compares to most recent entry
+   - Click any history item to reopen that county's modal
+
+6. COMPARISON FEATURES
+   - Baseline Comparison System:
+     * Pin any county in history as baseline
+     * All other counties show trend indicators vs baseline
+     * Green up arrow (▲): Higher than baseline
+     * Red down arrow (▼): Lower than baseline
+     * Gray dot (•): Same as baseline
+   - Income Percentile Ranking:
+     * Shows where county ranks among all counties
+     * Displays as "Xth percentile" in income distribution chart
+
+7. DATA FETCHING AND CACHING
+   - Local cache: Uses demographics.json for fast initial loads
+   - On-demand API fetching: Double-click county to fetch fresh data
+   - Loading indicators during API requests
+   - Error handling with fallback to cached data
+   - Toast notifications for user feedback
+
+8. DEMO MODE
+   - Interactive tutorial button (▶ Demo)
+   - Automatically demonstrates key features
+   - Shows California and Los Angeles County as example
+   - Can be skipped at any time
+
+================================================================================
+USER INTERFACE ELEMENTS
+================================================================================
+
+Upper Left Corner:
+- Logo (logo.svg)
+- Search Box with autocomplete dropdown
+
+Right Side Panel:
+- History panel showing recently viewed counties
+- Pin/unpin buttons for baseline comparison
+- Trend indicators for population, age, and income
+
+Bottom Left:
+- Instruction tip: "Click for cached data • Double-click for fresh ACS"
+
+Bottom Right:
+- Minimap (appears when zoomed into a state)
+- Shows overview of entire U.S. with viewport indicator
+
+Modal Window:
+- County name and state as header
+- Close button (X) in top right
+- Scrollable content with all demographic statistics
+- Collapsible sections for income distribution
+
+================================================================================
+KEYBOARD SHORTCUTS AND INTERACTIONS
+================================================================================
+
+Map Navigation:
+- Mouse Wheel: Zoom in/out
+- Click and Drag: Pan the map
+- Click State: Zoom to state and show counties
+- Click County: Open county modal with cached data
+- Double-click County: Fetch fresh data from Census API
+
+Search Box:
+- Type: Initiate search
+- Arrow Down: Navigate down through results
+- Arrow Up: Navigate up through results
+- Enter: Select highlighted result
+- Escape: Close dropdown
+
+History Panel:
+- Click County Card: Reopen county modal
+- Click Pin Icon: Toggle baseline pin
+
+Modal:
+- Click X: Close modal
+- Click Outside Modal: Close modal
+- Scroll: Navigate through all statistics
+
+================================================================================
+SETUP AND INSTALLATION
+================================================================================
+
+Prerequisites:
+- Node.js (v14 or higher recommended)
+- npm (Node Package Manager)
+
+Installation Steps:
+1. Navigate to project directory
+2. Install dependencies:
+   npm install
+
+3. (Optional) Set up Census API key:
+   - Create .env file in project root
+   - Add: VITE_CENSUS_API_KEY=your_api_key_here
+   - Get API key from: https://api.census.gov/data/key_signup.html
+   - See API_SETUP.md for detailed instructions
+
+4. Start development server:
+   npm run dev
+
+5. Open browser to:
+   http://localhost:5173
+
+Project Structure:
+- /src/main.js - Main application logic
+- /src/census.js - Census API integration
+- /src/utils/demographicBreakdowns.js - Demographic calculation utilities
+- /src/charts/ - Chart visualization modules
+- /public/us-states.json - State geographic data
+- /public/us-counties.json - County geographic data
+- /public/demographics.json - Cached demographic data
+- /index.html - Main HTML file
+- /logo.svg - Application logo
+
+================================================================================
+DATA SOURCES AND ACCURACY
+================================================================================
+
+Primary Data Source:
+- U.S. Census Bureau American Community Survey (ACS) 5-Year Estimates (2022)
+- Most comprehensive county-level demographic data available
+- Updated annually by Census Bureau
+- Includes data from 2018-2022 survey period
+
+Geographic Data:
+- TopoJSON format for efficient rendering
+- State and county boundaries from Census Bureau TIGER/Line files
+- FIPS codes used for unique county identification
+
+Data Variables Used:
+- B01001_001E: Total Population
+- B01002_001E: Median Age
+- B19013_001E: Median Household Income
+- B03002_*: Race and Ethnicity data
+- B01001_*: Age breakdown by gender
+- B11001_*: Household composition
+- B25024_*: Housing structure types
+- And many more ACS variables for comprehensive demographics
+
+================================================================================
+USE CASES
+================================================================================
+
+1. Demographic Research:
+   - Compare demographic profiles across counties
+   - Analyze generational composition
+   - Study income distribution patterns
+   - Research household structures
+
+2. Policy Analysis:
+   - Understand county-level demographics for policy decisions
+   - Compare counties for resource allocation
+   - Identify demographic trends
+
+3. Educational Purposes:
+   - Teach demographic concepts
+   - Visualize U.S. population distribution
+   - Understand census data
+
+4. Business Intelligence:
+   - Market research by location
+   - Demographic targeting
+   - Location analysis
+
+5. Personal Exploration:
+   - Learn about your county
+   - Compare your county to others
+   - Understand regional differences
+
+================================================================================
+LIMITATIONS AND NOTES
+================================================================================
+
+- Data is from 2022 ACS 5-Year Estimates (data from 2018-2022)
+- Some counties may not have complete data available
+- API rate limits may apply when fetching fresh data
+- Requires internet connection for API fetching
+- CORS restrictions may affect some API calls without proper setup
+- First-time county data fetch may take a few seconds
+
+================================================================================
+FUTURE ENHANCEMENT POSSIBILITIES
+================================================================================
+
+Potential features that could be added:
+- Export data functionality
+- Time-series comparisons (historical data)
+- Custom comparison groups
+- Additional demographic variables
+- Data visualization charts (bar charts, pie charts for demographics)
+- Print-friendly reports
+- Data sharing capabilities
+- Bookmark/save favorite counties
+- Advanced filtering options
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Common Issues:
+
+1. Map not loading:
+   - Check that us-states.json and us-counties.json are in /public folder
+   - Verify browser console for errors
+
+2. No demographic data showing:
+   - Check demographics.json file exists
+   - Try double-clicking county to fetch fresh data
+   - Verify API key is set correctly (if using)
+
+3. Search not working:
+   - Ensure JavaScript is enabled
+   - Check browser console for errors
+   - Verify counties data has loaded
+
+4. API fetch failures:
+   - Check internet connection
+   - Verify API key is valid (if using)
+   - Check Census API status
+   - See API_SETUP.md for CORS solutions
+
+5. Slow performance:
+   - Some operations (like income histogram) process all counties
+   - Large datasets may take a moment to render
+   - Close unnecessary browser tabs
+
+================================================================================
+CONTACT AND SUPPORT
+================================================================================
+
+For issues with:
+- Census API: See API_SETUP.md or visit https://api.census.gov
+- Application bugs: Check browser console for error messages
+- Data accuracy: Refer to U.S. Census Bureau documentation
+
+Data Documentation:
+- Census API Variables: https://api.census.gov/data/2022/acs/acs5/variables.html
+- ACS Overview: https://www.census.gov/programs-surveys/acs
+
+================================================================================
+VERSION INFORMATION
+================================================================================
+
+Project: DemoGraph
+Version: 1.0.0
+Last Updated: Based on 2022 ACS 5-Year Estimates
+
+Dependencies:
+- d3: ^7.9.0
+- topojson-client: ^3.1.0
+- chart.js: ^4.5.1
+- vite: ^7.1.12
+
+================================================================================
+END OF INSTRUCTIONS
+================================================================================
+
