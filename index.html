@@ -449,47 +449,6 @@
         color: white;
         font-size: 16px;
       }
-      /* Demo Button */
-      .demo-btn {
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 1100;
-        background: #4a90e2;
-        color: #fff;
-        border: 0;
-        border-radius: 6px;
-        padding: 8px 12px;
-        font-size: 14px;
-        cursor: pointer;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        transition: background 0.2s;
-      }
-      .demo-btn:hover {
-        background: #357abd;
-      }
-      .demo-btn:disabled {
-        background: #adb5bd;
-        cursor: not-allowed;
-      }
-      .demo-skip {
-        position: fixed;
-        top: 20px;
-        right: 100px;
-        z-index: 1100;
-        font-size: 13px;
-        color: #6c757d;
-        background: rgba(255,255,255,0.9);
-        padding: 6px 10px;
-        border-radius: 6px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        text-decoration: none;
-        cursor: pointer;
-        transition: color 0.2s;
-      }
-      .demo-skip:hover {
-        color: #212529;
-      }
       #history-panel {
         position: fixed;
         right: 0;
@@ -543,10 +502,201 @@
         color: #2e7d32; /* green */
       }
       .trend.down {
-        color: #c62828; /* red */
+        color: #c62828;
       }
       .trend.same {
-        color: #757575; /* neutral gray */
+        color: #757575;
+      }
+      .compare-btn {
+        margin-top: 8px;
+        padding: 4px 8px;
+        background: #4a90e2;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 11px;
+        cursor: pointer;
+        transition: background 0.2s;
+        width: 100%;
+      }
+      .compare-btn:hover {
+        background: #357abd;
+      }
+      .compare-btn:active {
+        transform: translateY(1px);
+      }
+      /* Comparison Modal */
+      .comparison-modal {
+        display: none;
+        position: fixed;
+        z-index: 2000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+        overflow: auto;
+      }
+      .comparison-modal.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .comparison-content {
+        background-color: #fff;
+        margin: 5% auto;
+        padding: 30px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 900px;
+        max-height: 85vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        position: relative;
+      }
+      .comparison-close {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        font-size: 28px;
+        font-weight: bold;
+        color: #aaa;
+        cursor: pointer;
+        line-height: 1;
+      }
+      .comparison-close:hover {
+        color: #000;
+      }
+      .comparison-header {
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #e0e0e0;
+      }
+      .comparison-header h2 {
+        margin: 0 0 10px 0;
+        color: #333;
+        font-size: 24px;
+      }
+      .comparison-counties {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #4a90e2;
+      }
+      .comparison-section {
+        margin-bottom: 25px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #4a90e2;
+      }
+      .comparison-section h3 {
+        margin: 0 0 12px 0;
+        color: #333;
+        font-size: 18px;
+        font-weight: 600;
+      }
+      .comparison-item {
+        margin-bottom: 10px;
+        padding: 10px;
+        background: white;
+        border-radius: 6px;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .comparison-item strong {
+        color: #4a90e2;
+      }
+      /* Market Opportunities Button */
+      .market-opportunities-btn {
+        background: #4a90e2;
+        color: #fff;
+        border: 0;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: background 0.2s, transform 0.1s;
+        margin-right: 10px;
+      }
+      .market-opportunities-btn:hover {
+        background: #357abd;
+        transform: translateY(-1px);
+        box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+      }
+      .market-opportunities-btn:active {
+        transform: translateY(0);
+      }
+      /* Marketing Insights Display */
+      .marketing-insights {
+        margin-top: 20px;
+        padding: 20px;
+        background: #f0f7ff;
+        border-radius: 8px;
+        border-left: 4px solid #4a90e2;
+      }
+      .marketing-insights h3 {
+        margin: 0 0 15px 0;
+        color: #333;
+        font-size: 18px;
+        font-weight: 600;
+      }
+      .marketing-insight-item {
+        margin-bottom: 15px;
+        padding: 12px;
+        background: white;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+      .marketing-insight-item h4 {
+        margin: 0 0 8px 0;
+        color: #4a90e2;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .marketing-insight-item p {
+        margin: 0;
+        color: #555;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .spending-breakdown {
+        margin-top: 15px;
+      }
+      .spending-category {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #e0e0e0;
+      }
+      .spending-category:last-child {
+        border-bottom: none;
+      }
+      .spending-category-label {
+        color: #666;
+        font-size: 14px;
+      }
+      .spending-category-percentage {
+        color: #333;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .spending-category-bar {
+        margin-top: 4px;
+        height: 6px;
+        background-color: #e0e0e0;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .spending-category-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4a90e2, #357abd);
+        transition: width 0.5s ease;
       }
     </style>
   </head>
@@ -567,11 +717,16 @@
     <div id="modal" class="modal">
       <div class="modal-content">
         <div class="modal-header">
-          <div>
-            <h2 class="county-name" id="modal-title">County Demographics</h2>
-            <p class="state-name" id="modal-subtitle"></p>
+          <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+            <button id="market-opportunities-btn" class="market-opportunities-btn">Market Opportunities</button>
+            <div>
+              <h2 class="county-name" id="modal-title">County Demographics</h2>
+              <p class="state-name" id="modal-subtitle"></p>
+            </div>
           </div>
-          <span class="close" id="modal-close">&times;</span>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span class="close" id="modal-close">&times;</span>
+          </div>
         </div>
         <div id="modal-body"></div>
       </div>
@@ -585,13 +740,19 @@
       <div class="loading-spinner">⏳</div>
       <div class="loading-text">Fetching ACS data...</div>
     </div>
-    <button id="demo-btn" class="demo-btn" aria-label="Play demo tour">▶ Demo</button>
-    <a id="demo-skip" class="demo-skip" aria-label="Skip demo" hidden>Skip</a>
     <script type="module" src="/src/main.js"></script>
     <div id="history-panel">
       <h3>History</h3>
       <div id="history-items"></div>
     </div>
+    <!-- Comparison Modal -->
+    <div id="comparison-modal" class="comparison-modal">
+      <div class="comparison-content">
+        <span class="comparison-close" id="comparison-close">&times;</span>
+        <div id="comparison-body"></div>
+      </div>
+    </div>
   </body>
 </html>
+
 

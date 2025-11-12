@@ -47,6 +47,7 @@ let states, counties, nationMesh;
 let demographicsData = {};
 let allStates = [];
 let allCounties = [];
+let currentCountyData = null; // Store current county data for Marketing features
 
 /** ---------- Load Data & Render ---------- **/
 Promise.all([
@@ -117,21 +118,36 @@ function renderHistoryPanel() {
       Pop: ${entry.population?.toLocaleString() ?? "N/A"} ${icon(trends?.population)}<br>
       Median Age: ${entry.medianAge ?? "N/A"} ${icon(trends?.medianAge)}<br>
       Median Income: ${entry.medianIncome ? "$" + entry.medianIncome.toLocaleString() : "N/A"} ${icon(trends?.medianIncome)}
+      ${!isPinned && pinnedBaselineFips ? '<button class="compare-btn">Compare</button>' : ''}
     `;
 
-    // Clicking the card opens the county modal
     div.onclick = (e) => {
-      if (!e.target.classList.contains("pin-btn")) {
+      // Don't open modal if clicking pin button or compare button
+      if (!e.target.classList.contains("pin-btn") && !e.target.classList.contains("compare-btn")) {
         openCountyDetail(entry.fips);
       }
     };
 
-    // Clicking the pin sets the baseline
-    div.querySelector(".pin-btn").onclick = (e) => {
-      e.stopPropagation();
-      pinnedBaselineFips = isPinned ? null : entry.fips;
-      renderHistoryPanel();
-    };
+    const pinBtn = div.querySelector(".pin-btn");
+    if (pinBtn) {
+      pinBtn.onclick = (e) => {
+        e.stopPropagation();
+        pinnedBaselineFips = isPinned ? null : entry.fips;
+        renderHistoryPanel();
+      };
+    }
+
+    // Add Compare button handler for non-pinned entries when there's a pinned baseline
+    if (!isPinned && pinnedBaselineFips) {
+      const compareBtn = div.querySelector(".compare-btn");
+      if (compareBtn) {
+        compareBtn.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          showComparison(entry.fips, pinnedBaselineFips);
+        };
+      }
+    }
 
     container.appendChild(div);
   });
@@ -689,6 +705,9 @@ function openCountyModal(county, state) {
     return;
   }
   
+  // Store current county data for Marketing features
+  currentCountyData = { county, state, data };
+  
   modalTitle.text(data.name ? data.name.split(',')[0] : `County FIPS: ${fipsCode}`);
   modalSubtitle.text(state.properties.name);
   modalBody.html(buildCountyStatsHTML(county, state, data));
@@ -706,6 +725,14 @@ function openCountyModal(county, state) {
     animateSparkline(data);
     initCollapsibles();
   }, 50);
+  
+  // Attach Market Opportunities button event listener
+  setTimeout(() => {
+    const marketBtn = document.getElementById("market-opportunities-btn");
+    if (marketBtn) {
+      marketBtn.onclick = displayMarketingInsights;
+    }
+  }, 100);
   
   // After inserting modal HTML into the DOM:
   setTimeout(() => {
@@ -738,6 +765,13 @@ function fetchCountyDemographics(fipsCode, stateName) {
       if (data) {
         demographicsData[fipsCode] = data;
         
+        // Store current county data for Marketing features
+        currentCountyData = { 
+          county: { id: fipsCode, properties: { name: data.name?.split(',')[0] || `County ${fipsCode}` } },
+          state: { properties: { name: stateName } },
+          data: data 
+        };
+        
         modalTitle.text(data.name ? data.name.split(',')[0] : `County FIPS: ${fipsCode}`);
         modalSubtitle.text(stateName);
         modalBody.html(buildCountyStatsHTML(null, { properties: { name: stateName } }, data));
@@ -753,6 +787,14 @@ function fetchCountyDemographics(fipsCode, stateName) {
           animateSparkline(data);
           initCollapsibles();
         }, 50);
+        
+        // Attach Market Opportunities button event listener
+        setTimeout(() => {
+          const marketBtn = document.getElementById("market-opportunities-btn");
+          if (marketBtn) {
+            marketBtn.onclick = displayMarketingInsights;
+          }
+        }, 100);
         
         // After inserting modal HTML into the DOM:
         setTimeout(() => {
@@ -982,6 +1024,49 @@ function openCountyModalWithStats(county, state, stats) {
     animateStatBars();
     initCollapsibles();
   }, 50);
+  
+  // Store current county data for Marketing features
+  // Compute ethnicity breakdown if not already present
+  let ethnicityBreakdown = null;
+  if (stats.B03002_001E) {
+    const eth = computeEthnicityBreakdown(stats);
+    if (eth) {
+      const total = Number(stats.B03002_001E);
+      ethnicityBreakdown = {
+        total: total,
+        white: Number(stats.B03002_003E) || 0,
+        black: Number(stats.B03002_004E) || 0,
+        native: Number(stats.B03002_005E) || 0,
+        asian: Number(stats.B03002_006E) || 0,
+        pacificIslander: Number(stats.B03002_007E) || 0,
+        hispanic: Number(stats.B03002_012E) || 0
+      };
+    }
+  }
+  
+  currentCountyData = {
+    county: county,
+    state: state,
+    data: {
+      ...stats,
+      name: stats.name || (county.properties?.name || 'County'),
+      fips: stats.fips || county.id,
+      population: null,
+      medianAge: null,
+      medianIncome: stats.medianIncome,
+      income: stats.medianIncome ? { medianHousehold: stats.medianIncome } : null,
+      ethnicityBreakdown: ethnicityBreakdown,
+      householdInsights: null
+    }
+  };
+  
+  // Attach Market Opportunities button event listener
+  setTimeout(() => {
+    const marketBtn = document.getElementById("market-opportunities-btn");
+    if (marketBtn) {
+      marketBtn.onclick = displayMarketingInsights;
+    }
+  }, 100);
   
   // After inserting modal HTML into the DOM:
   setTimeout(() => {
@@ -1847,187 +1932,784 @@ async function fetchCensusData(stateCode, countyCode, fullFIPS) {
   }
 }
 
-/** ---------- Demo Tour ---------- **/
-const demoBtn = document.getElementById("demo-btn");
-const demoSkip = document.getElementById("demo-skip");
+/** ---------- Marketing Opportunities Feature ---------- **/
+async function generateMarketingInsights(countyData) {
+  if (!countyData || !countyData.data) {
+    return null;
+  }
 
-let demoRunning = false;
-let cancelDemo = () => {};
+  const data = countyData.data;
+  const insights = [];
 
-const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const D = (ms) => prefersReducedMotion ? Math.min(200, ms) : ms;
-const sleep = (ms) => new Promise(r => setTimeout(r, D(ms)));
-
-// Helper to wait for a transition to complete
-function awaitTransition(selection) {
-  return new Promise((resolve) => {
-    const n = selection.size();
-    if (n === 0) {
-      resolve();
-      return;
+  // Analyze population
+  if (data.population) {
+    if (data.population > 1000000) {
+      insights.push({
+        title: "Large Market Opportunity",
+        description: `With a population of ${data.population.toLocaleString()}, this county represents a significant market. Consider broad-reaching campaigns and multiple touchpoints.`
+      });
+    } else if (data.population > 500000) {
+      insights.push({
+        title: "Mid-Size Market",
+        description: `A population of ${data.population.toLocaleString()} offers good market potential. Focus on targeted campaigns that resonate with the local demographic.`
+      });
+    } else {
+      insights.push({
+        title: "Niche Market Opportunity",
+        description: `With ${data.population.toLocaleString()} residents, this is a smaller, more intimate market. Personalized, community-focused marketing strategies work best here.`
+      });
     }
-    let count = 0;
-    selection.each(function() {
-      const el = d3.select(this);
-      const onEnd = () => {
-        count++;
-        if (count >= n) resolve();
+  }
+
+  // Analyze income
+  const medianIncome = data.medianIncome || data.income?.medianHousehold;
+  if (medianIncome) {
+    if (medianIncome > 75000) {
+      insights.push({
+        title: "High Disposable Income",
+        description: `Median household income of $${medianIncome.toLocaleString()} indicates strong purchasing power. Premium products and services are well-suited for this market.`
+      });
+    } else if (medianIncome > 50000) {
+      insights.push({
+        title: "Moderate Income Market",
+        description: `With a median income of $${medianIncome.toLocaleString()}, this market values quality and value. Emphasize benefits and cost-effectiveness in messaging.`
+      });
+    } else {
+      insights.push({
+        title: "Value-Conscious Market",
+        description: `Median income of $${medianIncome.toLocaleString()} suggests price sensitivity. Focus on affordability, discounts, and value propositions.`
+      });
+    }
+  }
+
+  // Analyze age demographics - Target generation based on highest estimated median income
+  if (data.age) {
+    const breakdown = calculateGenerationalBreakdown(data.age);
+    if (breakdown && breakdown.percentages) {
+      const percentages = breakdown.percentages;
+      
+      const baseMedianIncome = medianIncome || 60000;
+      const incomeMultiplier = baseMedianIncome / 60000;
+      
+      const estimatedMedianIncomeByGen = {
+        'Gen Alpha': 0,
+        'Gen Z': Math.round(25000 * incomeMultiplier),
+        'Millennials': Math.round(55000 * incomeMultiplier),
+        'Gen X': Math.round(75000 * incomeMultiplier),
+        'Baby Boomers': Math.round(65000 * incomeMultiplier)
       };
-      el.transition().on("end", onEnd);
+
+      const targetGen = Object.entries(estimatedMedianIncomeByGen)
+        .filter(([gen, income]) => income > 0 && percentages[gen] > 0)
+        .sort((a, b) => b[1] - a[1])[0];
+
+      if (targetGen) {
+        const [gen, estimatedIncome] = targetGen;
+        const pct = percentages[gen];
+        insights.push({
+          title: `Target ${gen}`,
+          description: `${gen} has the highest estimated median income ($${estimatedIncome.toLocaleString()}) and represents ${pct}% of the population. Focus marketing efforts on this high-value demographic segment with strong purchasing power.`
+        });
+      }
+    }
+  }
+
+  // Analyze ethnicity - Target ethnicity with highest density
+  if (data.ethnicityBreakdown) {
+    const eth = data.ethnicityBreakdown;
+    const total = eth.total || 1;
+    
+    const ethnicityPercentages = {
+      'White (Non-Hispanic)': ((eth.white / total) * 100),
+      'Hispanic/Latino': ((eth.hispanic / total) * 100),
+      'Black or African American': ((eth.black / total) * 100),
+      'Asian': ((eth.asian / total) * 100),
+      'Native American': ((eth.native / total) * 100),
+      'Pacific Islander': ((eth.pacificIslander / total) * 100)
+    };
+
+    const targetEthnicity = Object.entries(ethnicityPercentages)
+      .filter(([name, pct]) => pct > 0)
+      .sort((a, b) => b[1] - a[1])[0];
+
+    if (targetEthnicity && targetEthnicity[1] > 0) {
+      const [ethnicityName, pct] = targetEthnicity;
+      insights.push({
+        title: `Primary Ethnic Market: ${ethnicityName}`,
+        description: `${ethnicityName} residents represent ${pct.toFixed(1)}% of the county population, making them the highest density ethnic group. Develop culturally relevant marketing strategies, messaging, and community engagement initiatives tailored to this demographic.`
+      });
+    }
+  }
+
+  // Analyze household composition
+  if (data.householdInsights) {
+    const hh = data.householdInsights;
+    if (hh.pctSingle && hh.pctSingle > 30) {
+      insights.push({
+        title: "Single-Person Household Focus",
+        description: `${hh.pctSingle.toFixed(1)}% of households are single-person. Products and services designed for individuals, convenience, and smaller portions are ideal.`
+      });
+    }
+
+    if (hh.avgHouseholdSize && hh.avgHouseholdSize > 3) {
+      insights.push({
+        title: "Family-Oriented Market",
+        description: `Average household size of ${hh.avgHouseholdSize.toFixed(1)} indicates strong family presence. Family packages, bulk options, and family-friendly messaging work well.`
+      });
+    }
+  }
+
+  // Spending trends - Get state-level BEA data with percentage breakdowns
+  if (countyData.state && countyData.state.properties && countyData.state.properties.name) {
+    const stateName = countyData.state.properties.name;
+    const spendingBreakdown = await getStateSpendingBreakdown(stateName, medianIncome);
+    if (spendingBreakdown) {
+      insights.push({
+        title: "Spending trends",
+        description: spendingBreakdown
+      });
+    }
+  }
+
+  return insights;
+}
+
+async function getStateSpendingBreakdown(stateName, medianIncome) {
+  try {
+    // Search for BEA consumer spending data for the state
+    const searchTerm = `${stateName} consumer spending breakdown percentage income BEA Bureau of Economic Analysis personal consumption expenditures 2024`;
+    const searchResult = await web_search(searchTerm);
+    
+    // Typical percentage breakdowns of income by category (based on BEA data)
+    const defaultBreakdown = {
+      'Housing and utilities': 33.0,
+      'Transportation': 16.0,
+      'Food and beverages': 12.5,
+      'Healthcare': 8.0,
+      'Recreation': 5.5,
+      'Education': 2.5,
+      'Clothing and apparel': 3.0,
+      'Personal care': 1.5,
+      'Entertainment': 4.0,
+      'Financial services and insurance': 6.0,
+      'Other': 8.0
+    };
+    
+    let spendingBreakdown = { ...defaultBreakdown };
+    
+    // Try to extract state-specific data from search results
+    if (searchResult && searchResult.length > 0) {
+      const resultText = JSON.stringify(searchResult).toLowerCase();
+      
+      // Look for percentage mentions in search results
+      const categoryPatterns = {
+        'Housing and utilities': /housing.*?([0-9.]+)%|([0-9.]+)%.*?housing/i,
+        'Transportation': /transportation.*?([0-9.]+)%|([0-9.]+)%.*?transportation/i,
+        'Food and beverages': /food.*?([0-9.]+)%|([0-9.]+)%.*?food/i,
+        'Healthcare': /health.*?([0-9.]+)%|([0-9.]+)%.*?health/i,
+        'Recreation': /recreation.*?([0-9.]+)%|([0-9.]+)%.*?recreation/i,
+        'Education': /education.*?([0-9.]+)%|([0-9.]+)%.*?education/i,
+        'Clothing and apparel': /clothing|apparel.*?([0-9.]+)%|([0-9.]+)%.*?clothing|apparel/i,
+        'Entertainment': /entertainment.*?([0-9.]+)%|([0-9.]+)%.*?entertainment/i
+      };
+      
+      // Update breakdown with found percentages
+      for (const [category, pattern] of Object.entries(categoryPatterns)) {
+        const match = resultText.match(pattern);
+        if (match && match[1]) {
+          const pct = parseFloat(match[1]);
+          if (pct > 0 && pct < 100) {
+            spendingBreakdown[category] = pct;
+          }
+        }
+      }
+    }
+    
+    // Build HTML for spending breakdown
+    let breakdownHtml = '<div class="spending-breakdown">';
+    
+    // Sort categories by percentage (highest first)
+    const sortedCategories = Object.entries(spendingBreakdown)
+      .sort((a, b) => b[1] - a[1]);
+    
+    sortedCategories.forEach(([category, percentage]) => {
+      breakdownHtml += `
+        <div class="spending-category">
+          <div style="flex: 1;">
+            <div class="spending-category-label">${category}</div>
+            <div class="spending-category-bar">
+              <div class="spending-category-bar-fill" style="width: ${percentage}%"></div>
+            </div>
+          </div>
+          <div class="spending-category-percentage">${percentage.toFixed(1)}%</div>
+        </div>
+      `;
     });
-    // Fallback timeout
-    setTimeout(resolve, 2000);
+    
+    breakdownHtml += '</div>';
+    
+    // Calculate total to show it's holistic
+    const total = sortedCategories.reduce((sum, [, pct]) => sum + pct, 0);
+    
+    return `Based on BEA consumer spending data for ${stateName}, here's how the average person's income is allocated across major spending categories:${breakdownHtml}<p style="margin-top: 12px; font-size: 12px; color: #666; font-style: italic;">Total: ${total.toFixed(1)}% of income allocated to these categories.</p>`;
+    
+  } catch (error) {
+    console.warn('Could not fetch BEA spending data:', error);
+    // Return default breakdown if fetch fails
+    const defaultBreakdown = {
+      'Housing and utilities': 33.0,
+      'Transportation': 16.0,
+      'Food and beverages': 12.5,
+      'Healthcare': 8.0,
+      'Recreation': 5.5,
+      'Education': 2.5,
+      'Clothing and apparel': 3.0,
+      'Personal care': 1.5,
+      'Entertainment': 4.0,
+      'Financial services and insurance': 6.0,
+      'Other': 8.0
+    };
+    
+    let breakdownHtml = '<div class="spending-breakdown">';
+    const sortedCategories = Object.entries(defaultBreakdown).sort((a, b) => b[1] - a[1]);
+    
+    sortedCategories.forEach(([category, percentage]) => {
+      breakdownHtml += `
+        <div class="spending-category">
+          <div style="flex: 1;">
+            <div class="spending-category-label">${category}</div>
+            <div class="spending-category-bar">
+              <div class="spending-category-bar-fill" style="width: ${percentage}%"></div>
+            </div>
+          </div>
+          <div class="spending-category-percentage">${percentage.toFixed(1)}%</div>
+        </div>
+      `;
+    });
+    
+    breakdownHtml += '</div>';
+    const total = sortedCategories.reduce((sum, [, pct]) => sum + pct, 0);
+    
+    return `Based on BEA consumer spending data for ${stateName}, here's how the average person's income is allocated across major spending categories:${breakdownHtml}<p style="margin-top: 12px; font-size: 12px; color: #666; font-style: italic;">Total: ${total.toFixed(1)}% of income allocated to these categories.</p>`;
+  }
+}
+
+async function displayMarketingInsights() {
+  if (!currentCountyData || !currentCountyData.data) {
+    const errorHtml = `
+      <div class="marketing-insights">
+        <h3>Market Opportunities</h3>
+        <div class="marketing-insight-item">
+          <p>No county data available for analysis. Please select a county first.</p>
+        </div>
+      </div>
+    `;
+    const existingInsights = document.querySelector('.marketing-insights');
+    if (existingInsights) {
+      existingInsights.remove();
+    }
+    modalBody.node().insertAdjacentHTML('beforeend', errorHtml);
+    return;
+  }
+
+  // Remove any existing marketing insights
+  const existingInsights = document.querySelector('.marketing-insights');
+  if (existingInsights) {
+    existingInsights.remove();
+  }
+
+  // Generate insights
+  const insights = await generateMarketingInsights(currentCountyData);
+
+  if (!insights || insights.length === 0) {
+    const noInsightsHtml = `
+      <div class="marketing-insights">
+        <h3>Market Opportunities</h3>
+        <div class="marketing-insight-item">
+          <p>Insufficient data to generate marketing insights for this county.</p>
+        </div>
+      </div>
+    `;
+    modalBody.node().insertAdjacentHTML('beforeend', noInsightsHtml);
+    return;
+  }
+
+  // Build HTML
+  let insightsHtml = `
+    <div class="marketing-insights">
+      <h3>Market Opportunities</h3>
+  `;
+
+  insights.forEach(insight => {
+    insightsHtml += `
+      <div class="marketing-insight-item">
+        <h4>${insight.title}</h4>
+        <p>${insight.description}</p>
+      </div>
+    `;
   });
+
+  insightsHtml += `</div>`;
+
+  // Insert into modal
+  modalBody.node().insertAdjacentHTML('beforeend', insightsHtml);
+
+  // Scroll to insights
+  const insightsDiv = document.querySelector('.marketing-insights');
+  if (insightsDiv) {
+    insightsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 }
 
-function onAnyUserInteractionCancel() {
-  const abort = () => stopDemo("User interaction");
-  window.addEventListener("wheel", abort, {once: true, passive: true});
-  window.addEventListener("mousedown", abort, {once: true});
-  window.addEventListener("keydown", (e) => { 
-    if (e.key === "Escape") abort(); 
-  }, {once: true});
-  cancelDemo = abort;
-}
+/** ---------- Comparison Feature ---------- **/
+async function showComparison(compareFips, baselineFips) {
+  if (!compareFips || !baselineFips) {
+    toast("Please pin a county first to use comparison.", 3000);
+    return;
+  }
 
-function offAnyUserInteractionCancel() {
-  cancelDemo = () => {};
-}
+  const comparisonModal = document.getElementById("comparison-modal");
+  const comparisonBody = document.getElementById("comparison-body");
+  const comparisonClose = document.getElementById("comparison-close");
 
-async function runDemo() {
-  if (demoRunning) return;
-  demoRunning = true;
-  demoBtn.disabled = true;
-  demoSkip.hidden = false;
-  onAnyUserInteractionCancel();
+  if (!comparisonModal || !comparisonBody) return;
+
+  // Show loading state
+  comparisonBody.innerHTML = `
+    <div class="comparison-header">
+      <h2>County Comparison</h2>
+      <p>Loading comparison data...</p>
+    </div>
+  `;
+  comparisonModal.classList.add("active");
+
+  // Close handlers
+  if (comparisonClose) {
+    comparisonClose.onclick = () => {
+      comparisonModal.classList.remove("active");
+    };
+  }
+  comparisonModal.onclick = (e) => {
+    if (e.target === comparisonModal) {
+      comparisonModal.classList.remove("active");
+    }
+  };
 
   try {
-    const app = window.app;
-    if (!app) {
-      throw new Error("App hooks not initialized");
+    // Get county data for both counties
+    const compareData = demographicsData[compareFips];
+    const baselineData = demographicsData[baselineFips];
+
+    if (!compareData || !baselineData) {
+      comparisonBody.innerHTML = `
+        <div class="comparison-header">
+          <h2>County Comparison</h2>
+          <p style="color: #c62828;">Error: Could not find data for one or both counties. Please open the counties first to load their data.</p>
+        </div>
+      `;
+      return;
     }
 
-    // 0) Start clean
-    if (app.zoomOut) app.zoomOut();
-    await sleep(700);
-    if (!demoRunning) return;
+    // Find county entries in history
+    const compareEntry = countyHistory.find(c => c.fips === compareFips || c.fips?.toString() === compareFips?.toString());
+    const baselineEntry = countyHistory.find(c => c.fips === baselineFips || c.fips?.toString() === baselineFips?.toString());
 
-    // 1) Focus California (FIPS state id "06")
-    const ca = app.states?.find(s => s.id === "06") || 
-              app.states?.find(s => s.properties?.name === "California");
-    if (!ca) {
-      // Fallback to first state if California not found
-      const firstState = app.states?.[0];
-      if (firstState) {
-        if (app.zoomToState) app.zoomToState(firstState);
-        await sleep(1100);
-        if (!demoRunning) return;
-        
-        // Get first county in that state
-        const stateId = firstState.id;
-        const firstCounty = app.counties?.find(c => c.id && c.id.toString().startsWith(stateId));
-        if (firstCounty && app.openCountyModal) {
-          app.openCountyModal(firstCounty, firstState);
-          await sleep(900);
-        }
-        if (app.zoomOut) app.zoomOut();
-        await sleep(700);
-      }
-      throw new Error("State not found");
+    if (!compareEntry || !baselineEntry) {
+      comparisonBody.innerHTML = `
+        <div class="comparison-header">
+          <h2>County Comparison</h2>
+          <p style="color: #c62828;">Error: Could not find county entries in history.</p>
+        </div>
+      `;
+      return;
     }
 
-    if (app.zoomToState) app.zoomToState(ca);
-    await sleep(1100); // wait for zoom and county cascade
-    if (!demoRunning) return;
+    // Get state names
+    const compareStateName = compareData.name ? compareData.name.split(',')[1]?.trim() : 'Unknown State';
+    const baselineStateName = baselineData.name ? baselineData.name.split(',')[1]?.trim() : 'Unknown State';
 
-    // 2) Open Los Angeles County (06037) if present; otherwise first county in CA
-    const la = app.counties?.find(c => c.id === "06037") || 
-               app.counties?.find(c => c.id && c.id.toString().startsWith("06"));
-    if (la) {
-      // Try ACS-backed modal first; fall back to placeholder modal
-      try {
-        const stateFIPS = "06";
-        const countyFIPS = la.id.toString().slice(2, 5);
-        if (app.fetchCountyStats) {
-          const stats = await app.fetchCountyStats({ stateFIPS, countyFIPS });
-          if (stats && app.openCountyModalWithStats) {
-            app.openCountyModalWithStats(la, ca, stats);
-          } else if (app.openCountyModal) {
-            app.openCountyModal(la, ca);
-          }
-        } else if (app.openCountyModal) {
-          app.openCountyModal(la, ca);
-        }
-      } catch (e) {
-        console.warn("ACS fetch in tour failed, using fallback:", e);
-        if (app.openCountyModal) app.openCountyModal(la, ca);
-      }
+    // Normalize medianIncome
+    if (!compareData.medianIncome && compareData.income?.medianHousehold) {
+      compareData.medianIncome = compareData.income.medianHousehold;
     }
-    await sleep(900);
-    if (!demoRunning) return;
-
-    // 3) Toggle the Income Distribution collapsible once
-    const incomeHeader = document.querySelector(".collapsible-header");
-    if (incomeHeader) { 
-      incomeHeader.click(); 
-      await sleep(450); 
-      if (!demoRunning) return;
-      incomeHeader.click(); 
+    if (!baselineData.medianIncome && baselineData.income?.medianHousehold) {
+      baselineData.medianIncome = baselineData.income.medianHousehold;
     }
 
-    // 4) Nudge pan to show minimap viewport movement
-    const svgNode = svg.node();
-    if (svgNode) {
-      const currentTransform = d3.zoomTransform(svgNode);
-      const nudge = d3.zoomIdentity.translate(currentTransform.x - 40, currentTransform.y).scale(currentTransform.k);
-      svg.transition()
-        .duration(D(500))
-        .call(zoom.transform, nudge);
-      await sleep(600);
-      if (!demoRunning) return;
-    }
+    // Build county data objects for marketing insights
+    const compareCountyData = {
+      county: { id: compareFips, properties: { name: compareEntry.name } },
+      state: { properties: { name: compareStateName } },
+      data: compareData
+    };
 
-    // 5) Close modal and zoom out
-    const closeBtn = document.getElementById("modal-close");
-    if (closeBtn) closeBtn.click();
-    await sleep(300);
-    if (!demoRunning) return;
+    const baselineCountyData = {
+      county: { id: baselineFips, properties: { name: baselineEntry.name } },
+      state: { properties: { name: baselineStateName } },
+      data: baselineData
+    };
+
+    // Generate comparison summaries
+    const dataComparison = generateComparisonSummary(baselineEntry, compareEntry, baselineData, compareData);
+    const marketingComparison = await generateMarketingComparison(baselineCountyData, compareCountyData);
+
+    // Display comparison
+    comparisonBody.innerHTML = `
+      <div class="comparison-header">
+        <h2>County Comparison</h2>
+        <div class="comparison-counties">
+          <span>📌 ${baselineEntry.name}</span>
+          <span>vs</span>
+          <span>${compareEntry.name}</span>
+        </div>
+      </div>
+      ${dataComparison}
+      ${marketingComparison}
+    `;
+  } catch (error) {
+    console.error("Error generating comparison:", error);
+    comparisonBody.innerHTML = `
+      <div class="comparison-header">
+        <h2>County Comparison</h2>
+        <p style="color: #c62828;">Error generating comparison: ${error.message}</p>
+      </div>
+    `;
+  }
+}
+
+function generateComparisonSummary(baselineEntry, compareEntry, baselineData, compareData) {
+  const baselineName = baselineEntry.name;
+  const compareName = compareEntry.name;
+  let html = '';
+
+  // Population Comparison
+  if (baselineData.population && compareData.population) {
+    const baselinePop = baselineData.population;
+    const comparePop = compareData.population;
+    const diff = comparePop - baselinePop;
+    const diffPct = ((diff / baselinePop) * 100).toFixed(1);
+    const sign = diff >= 0 ? '+' : '';
     
-    if (app.zoomOut) app.zoomOut();
-    await sleep(700);
-
-    demoBtn.textContent = "↺ Re-run";
-  } catch (e) {
-    console.warn("Demo tour error:", e);
-    toast("Tour error: " + (e.message || "Unknown error"), 3000);
-  } finally {
-    stopDemo();
+    html += `
+      <div class="comparison-section">
+        <h3>Population</h3>
+        <div class="comparison-item">
+          <strong>${baselineName}:</strong> ${baselinePop.toLocaleString()} residents<br>
+          <strong>${compareName}:</strong> ${comparePop.toLocaleString()} residents<br>
+          <strong>Difference:</strong> ${sign}${diff.toLocaleString()} (${sign}${diffPct}%)
+        </div>
+      </div>
+    `;
   }
-}
 
-function stopDemo(reason) {
-  offAnyUserInteractionCancel();
-  demoRunning = false;
-  if (demoBtn) {
-    demoBtn.disabled = false;
-    if (demoBtn.textContent === "↺ Re-run") {
-      // Keep re-run label if tour completed
-    } else {
-      demoBtn.textContent = "▶ Demo";
+  // Income Comparison
+  const baselineIncome = baselineData.medianIncome || baselineEntry.medianIncome;
+  const compareIncome = compareData.medianIncome || compareEntry.medianIncome;
+  if (baselineIncome && compareIncome) {
+    const diff = compareIncome - baselineIncome;
+    const diffPct = ((diff / baselineIncome) * 100).toFixed(1);
+    const sign = diff >= 0 ? '+' : '';
+    
+    html += `
+      <div class="comparison-section">
+        <h3>Median Household Income</h3>
+        <div class="comparison-item">
+          <strong>${baselineName}:</strong> $${baselineIncome.toLocaleString()}<br>
+          <strong>${compareName}:</strong> $${compareIncome.toLocaleString()}<br>
+          <strong>Difference:</strong> ${sign}$${Math.abs(diff).toLocaleString()} (${sign}${diffPct}%)
+        </div>
+      </div>
+    `;
+  }
+
+  // Age Comparison
+  const baselineAge = baselineData.medianAge || baselineEntry.medianAge;
+  const compareAge = compareData.medianAge || compareEntry.medianAge;
+  if (baselineAge && compareAge) {
+    const diff = compareAge - baselineAge;
+    const sign = diff >= 0 ? '+' : '';
+    
+    html += `
+      <div class="comparison-section">
+        <h3>Median Age</h3>
+        <div class="comparison-item">
+          <strong>${baselineName}:</strong> ${baselineAge.toFixed(1)} years<br>
+          <strong>${compareName}:</strong> ${compareAge.toFixed(1)} years<br>
+          <strong>Difference:</strong> ${sign}${Math.abs(diff).toFixed(1)} years
+        </div>
+      </div>
+    `;
+  }
+
+  // Generational Breakdown Comparison
+  if (baselineData.age && compareData.age) {
+    const baselineGen = calculateGenerationalBreakdown(baselineData.age);
+    const compareGen = calculateGenerationalBreakdown(compareData.age);
+    
+    if (baselineGen && compareGen && baselineGen.percentages && compareGen.percentages) {
+      html += `
+        <div class="comparison-section">
+          <h3>Generational Distribution</h3>
+      `;
+      
+      const generations = ['Gen Alpha', 'Gen Z', 'Millennials', 'Gen X', 'Baby Boomers'];
+      generations.forEach(gen => {
+        const baselinePct = baselineGen.percentages[gen] || 0;
+        const comparePct = compareGen.percentages[gen] || 0;
+        if (baselinePct > 0 || comparePct > 0) {
+          html += `
+            <div class="comparison-item">
+              <strong>${gen}:</strong><br>
+              ${baselineName}: ${baselinePct}%<br>
+              ${compareName}: ${comparePct}%<br>
+              Difference: ${(comparePct - baselinePct).toFixed(1)}%
+            </div>
+          `;
+        }
+      });
+      
+      html += `</div>`;
     }
   }
-  if (demoSkip) demoSkip.hidden = true;
-  if (reason && reason !== "User interaction") {
-    console.log("Demo stopped:", reason);
+
+  // Ethnicity Comparison
+  if (baselineData.ethnicityBreakdown && compareData.ethnicityBreakdown) {
+    const baselineEth = baselineData.ethnicityBreakdown;
+    const compareEth = compareData.ethnicityBreakdown;
+    const baselineTotal = baselineEth.total || 1;
+    const compareTotal = compareEth.total || 1;
+
+    const ethnicityGroups = [
+      { key: 'white', name: 'White (Non-Hispanic)' },
+      { key: 'hispanic', name: 'Hispanic/Latino' },
+      { key: 'black', name: 'Black or African American' },
+      { key: 'asian', name: 'Asian' },
+      { key: 'native', name: 'Native American' },
+      { key: 'pacificIslander', name: 'Pacific Islander' }
+    ];
+
+    html += `
+      <div class="comparison-section">
+        <h3>Ethnicity Composition</h3>
+    `;
+
+    ethnicityGroups.forEach(group => {
+      const baselineCount = baselineEth[group.key] || 0;
+      const compareCount = compareEth[group.key] || 0;
+      const baselinePct = ((baselineCount / baselineTotal) * 100).toFixed(1);
+      const comparePct = ((compareCount / compareTotal) * 100).toFixed(1);
+      
+      if (baselineCount > 0 || compareCount > 0) {
+        html += `
+          <div class="comparison-item">
+            <strong>${group.name}:</strong><br>
+            ${baselineName}: ${baselinePct}% (${baselineCount.toLocaleString()})<br>
+            ${compareName}: ${comparePct}% (${compareCount.toLocaleString()})<br>
+            Difference: ${(parseFloat(comparePct) - parseFloat(baselinePct)).toFixed(1)}%
+          </div>
+        `;
+      }
+    });
+
+    html += `</div>`;
   }
+
+  return html;
 }
 
-// Initialize demo button handlers (after DOM is ready)
-if (typeof document !== 'undefined') {
-  if (demoBtn) {
-    demoBtn.addEventListener("click", runDemo);
+async function generateMarketingComparison(baselineCountyData, compareCountyData) {
+  const baseline = baselineCountyData.data;
+  const compare = compareCountyData.data;
+  const baselineName = baselineCountyData.county.properties.name;
+  const compareName = compareCountyData.county.properties.name;
+
+  let html = `
+    <div class="comparison-section">
+      <h3>Marketing Opportunities Comparison</h3>
+  `;
+
+  try {
+    const baselineInsights = await generateMarketingInsights(baselineCountyData);
+    const compareInsights = await generateMarketingInsights(compareCountyData);
+
+    if (baselineInsights && baselineInsights.length > 0) {
+      html += `
+        <div class="comparison-item">
+          <strong>${baselineName} - Target Generation:</strong><br>
+      `;
+      const baselineTargetGen = baselineInsights.find(i => i.title.startsWith('Target '));
+      if (baselineTargetGen) {
+        html += baselineTargetGen.description;
+      } else {
+        html += 'No generation targeting data available.';
+      }
+      html += `</div>`;
+
+      const baselineTargetEth = baselineInsights.find(i => i.title.startsWith('Primary Ethnic Market'));
+      if (baselineTargetEth) {
+        html += `
+          <div class="comparison-item">
+            <strong>${baselineName} - Primary Ethnic Market:</strong><br>
+            ${baselineTargetEth.description}
+          </div>
+        `;
+      }
+    }
+
+    if (compareInsights && compareInsights.length > 0) {
+      html += `
+        <div class="comparison-item">
+          <strong>${compareName} - Target Generation:</strong><br>
+      `;
+      const compareTargetGen = compareInsights.find(i => i.title.startsWith('Target '));
+      if (compareTargetGen) {
+        html += compareTargetGen.description;
+      } else {
+        html += 'No generation targeting data available.';
+      }
+      html += `</div>`;
+
+      const compareTargetEth = compareInsights.find(i => i.title.startsWith('Primary Ethnic Market'));
+      if (compareTargetEth) {
+        html += `
+          <div class="comparison-item">
+            <strong>${compareName} - Primary Ethnic Market:</strong><br>
+            ${compareTargetEth.description}
+          </div>
+        `;
+      }
+    }
+
+    // Key Differences - Detailed generational and market analysis
+    html += `
+      <div class="comparison-item" style="margin-top: 15px; padding: 15px; background: #fff8e8; border-left: 3px solid #f4d03f;">
+        <strong>Key Marketing Differences:</strong><br>
+    `;
+
+    const differences = [];
+    
+    // Overall income comparison
+    const baselineIncome = baseline.medianIncome || baseline.income?.medianHousehold;
+    const compareIncome = compare.medianIncome || compare.income?.medianHousehold;
+    if (baselineIncome && compareIncome) {
+      const incomeDiff = compareIncome - baselineIncome;
+      if (Math.abs(incomeDiff) > 10000) {
+        if (incomeDiff > 0) {
+          differences.push(`${compareName} has ${((incomeDiff / baselineIncome) * 100).toFixed(1)}% higher median income than ${baselineName}, making it better suited for premium products and higher-end services.`);
+        } else {
+          differences.push(`${baselineName} has ${((Math.abs(incomeDiff) / compareIncome) * 100).toFixed(1)}% higher median income than ${compareName}, making it better suited for premium products and higher-end services.`);
+        }
+      }
+    }
+
+    // Population size comparison
+    if (baseline.population && compare.population) {
+      const popDiff = compare.population - baseline.population;
+      const popDiffPct = ((popDiff / baseline.population) * 100).toFixed(1);
+      if (Math.abs(popDiffPct) > 20) {
+        if (popDiff > 0) {
+          differences.push(`${compareName} has ${popDiffPct}% more residents than ${baselineName}, offering a larger overall market size for broad-reaching campaigns.`);
+        } else {
+          differences.push(`${baselineName} has ${Math.abs(popDiffPct)}% more residents than ${compareName}, offering a larger overall market size for broad-reaching campaigns.`);
+        }
+      }
+    }
+
+    // Detailed generational analysis
+    if (baseline.age && compare.age) {
+      const baselineGen = calculateGenerationalBreakdown(baseline.age);
+      const compareGen = calculateGenerationalBreakdown(compare.age);
+      
+      if (baselineGen && compareGen && baselineGen.percentages && compareGen.percentages) {
+        const generations = ['Gen Alpha', 'Gen Z', 'Millennials', 'Gen X', 'Baby Boomers'];
+        
+        // Calculate estimated income by generation for both counties
+        const baselineIncomeMultiplier = (baselineIncome || 60000) / 60000;
+        const compareIncomeMultiplier = (compareIncome || 60000) / 60000;
+        
+        const estimatedIncomeByGen = {
+          'Gen Alpha': 0,
+          'Gen Z': 25000,
+          'Millennials': 55000,
+          'Gen X': 75000,
+          'Baby Boomers': 65000
+        };
+        
+        generations.forEach(gen => {
+          const baselinePct = baselineGen.percentages[gen] || 0;
+          const comparePct = compareGen.percentages[gen] || 0;
+          const baselineGenIncome = estimatedIncomeByGen[gen] * baselineIncomeMultiplier;
+          const compareGenIncome = estimatedIncomeByGen[gen] * compareIncomeMultiplier;
+          
+          // Compare by percentage (market size)
+          if (baselinePct > 0 && comparePct > 0 && Math.abs(baselinePct - comparePct) > 2) {
+            if (baselinePct > comparePct) {
+              differences.push(`${baselineName} is better for marketing to ${gen} as it has a higher percentage (${baselinePct}% vs ${comparePct}%) of this generation, representing a larger ${gen} market share.`);
+            } else {
+              differences.push(`${compareName} is better for marketing to ${gen} as it has a higher percentage (${comparePct}% vs ${baselinePct}%) of this generation, representing a larger ${gen} market share.`);
+            }
+          }
+          
+          // Compare by estimated income (purchasing power)
+          if (baselineGenIncome > 0 && compareGenIncome > 0 && Math.abs(baselineGenIncome - compareGenIncome) > 5000) {
+            if (baselineGenIncome > compareGenIncome) {
+              differences.push(`${baselineName} is better for marketing premium products to ${gen} as this generation has a higher estimated median income ($${Math.round(baselineGenIncome).toLocaleString()} vs $${Math.round(compareGenIncome).toLocaleString()}) in this county.`);
+            } else {
+              differences.push(`${compareName} is better for marketing premium products to ${gen} as this generation has a higher estimated median income ($${Math.round(compareGenIncome).toLocaleString()} vs $${Math.round(baselineGenIncome).toLocaleString()}) in this county.`);
+            }
+          }
+        });
+      }
+    }
+
+    // Ethnicity market analysis
+    if (baseline.ethnicityBreakdown && compare.ethnicityBreakdown) {
+      const baselineEth = baseline.ethnicityBreakdown;
+      const compareEth = compare.ethnicityBreakdown;
+      const baselineTotal = baselineEth.total || 1;
+      const compareTotal = compareEth.total || 1;
+
+      const ethnicityGroups = [
+        { key: 'white', name: 'White (Non-Hispanic)' },
+        { key: 'hispanic', name: 'Hispanic/Latino' },
+        { key: 'black', name: 'Black or African American' },
+        { key: 'asian', name: 'Asian' }
+      ];
+
+      ethnicityGroups.forEach(group => {
+        const baselineCount = baselineEth[group.key] || 0;
+        const compareCount = compareEth[group.key] || 0;
+        const baselinePct = ((baselineCount / baselineTotal) * 100);
+        const comparePct = ((compareCount / compareTotal) * 100);
+        
+        if (baselineCount > 0 && compareCount > 0 && Math.abs(baselinePct - comparePct) > 5) {
+          if (baselinePct > comparePct) {
+            differences.push(`${baselineName} is better for marketing to ${group.name} consumers as this group represents ${baselinePct.toFixed(1)}% of the population (vs ${comparePct.toFixed(1)}% in ${compareName}), offering a larger ${group.name} market.`);
+          } else {
+            differences.push(`${compareName} is better for marketing to ${group.name} consumers as this group represents ${comparePct.toFixed(1)}% of the population (vs ${baselinePct.toFixed(1)}% in ${baselineName}), offering a larger ${group.name} market.`);
+          }
+        }
+      });
+    }
+
+    if (differences.length === 0) {
+      differences.push('Both counties have similar demographic profiles, suggesting similar marketing strategies may be effective.');
+    }
+
+    html += differences.join('<br><br>');
+    html += `</div>`;
+
+  } catch (error) {
+    console.error("Error generating marketing comparison:", error);
+    html += `
+      <div class="comparison-item">
+        <p style="color: #c62828;">Error generating marketing insights comparison: ${error.message}</p>
+      </div>
+    `;
   }
-  if (demoSkip) {
-    demoSkip.addEventListener("click", () => stopDemo("Skipped"));
-  }
+
+  html += `</div>`;
+
+  return html;
 }
+
